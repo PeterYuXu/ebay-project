@@ -217,6 +217,20 @@ contract EcommerceStore {
         productToEscrow[_productId] = escrow;
         buyer.transfer(product.highestBid - product.secondHighestBid);
     }
+
+    function getEscrowInfo(unit _productId)public view returns(address, address, address, uint, uint){
+        address escrow = productToEscrow[_productId];
+        Escrow instanceContract = Escrow(escrow);
+        return instanceContract.escrowInfo();
+    }
+
+    function giveToSeller(uint _productId)public{
+        Escrow(productToEscrow[_productId]).giveMoneyToSeller(msg.sender);
+    }
+
+    function giveToBuyer(uint _productId)public{
+        Escrow(productToEscrow[_productId]).giveMoneyToBuyer(msg.sender);
+    }
 }
 
 contract Escrow{
