@@ -226,6 +226,15 @@ contract Escrow{
     address seller;
     //仲裁人
     address arbiter;
+    //卖家获得的票数
+    uint sellerVotesCount;
+    //买家获得的票数
+    uint buyerVotesCount;
+    //标记某个地址是否已经投票
+    mapping(address => bool) addressVotedMap;
+
+    //是否已经完成付款
+    bool isSpent = false;
 
     constructor(address _buyer,address _seller,address _arbiter)public payable {
         buyer = _buyer;
@@ -233,5 +242,39 @@ contract Escrow{
         arbiter = _arbiter;
     }
 
+    //方法
+    function giveMoneyToSeller(address caller) callerRestrict(caller) pubic {
+        //记录已经投票的状态，如果投过票，就设置为true
+        require(!addressVotedMap[caller]);
+        addressVotedMap[caller] = true;
+        require(!isSpent);
+        if(++sellerVotesCount == 2){
+            isSpent = true;
+            seller.transfer(address(this).balance);
+        }
+    }
 
+    function giveMoneyToBuyer(address caller)callerRestrict(caller)public {
+        require(!addressVotedMap[caller]);
+        addressVotedMap[caller] = true;
+        require(!isSpent);
+        if(++buyerVotesCount==2){
+            isSpent = true;
+            buyer.transfer(address(this).balance);
+        }
+    }
+
+
+    function getBalance () public view returns(uint){
+        return this.balance;
+    }
+
+    modifier callerRestrict(address caller){
+        require(caller == seller || caller == buyer || caller == arbiter);
+        _;
+    }
+
+    function escrowInfo() public view returns(address, address, address, uint, uint) {
+        return (buyer, seller, arbiter, buyerVotesCount, sellerVotesCount);
+    }
 }
