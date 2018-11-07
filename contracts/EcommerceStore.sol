@@ -152,13 +152,13 @@ contract EcommerceStore {
                     //退款给最高价竞标人
                     refund = confusePrice - idealPrice;
                 }
-            }else{
+            } else {
                 //路径4：价格低于最高价，但是高于次高价
-                if(idealPrice > product.secondHighestBid){
+                if (idealPrice > product.secondHighestBid) {
                     //更新次高价，那会自己的钱
                     product.secondHighestBid = idealPrice;
                     refund = confusePrice;
-                }else{
+                } else {
                     //路径5：路人甲，价格低于次高价，直接退款
                     refund = confusePrice;
                 }
@@ -167,27 +167,71 @@ contract EcommerceStore {
 
         emit revealEvent(_productId, bidId, confusePrice, currBid.price, refund);
 
-        if(refund > 0){
+        if (refund > 0) {
             msg.sender.transfer(refund);
         }
     }
 
     //转换函数
-    function stringToUint(string s)private pure returns(uint){
+    function stringToUint(string s) private pure returns (uint){
         bytes memory b = bytes(s);
         uint result = 0;
-        for(uint i=0;i<b.length;i++){
-            if(b[i] >= 48 && b[i] <= 57){
-                result = result * 10 + (uint(b[i])-48);
+        for (uint i = 0; i < b.length; i++) {
+            if (b[i] >= 48 && b[i] <= 57) {
+                result = result * 10 + (uint(b[i]) - 48);
             }
         }
         return result;
     }
 
     //返回当前最高竞标信息
-    function getHighestBidInfo(uint _productId)public view returns(address,uint,uint){
+    function getHighestBidInfo(uint _productId) public view returns (address, uint, uint){
         Product memory product = stores[productIdToOwner[_productId]][_productId];
         return (product.highestBidder, product.highestBid, product.secondHighestBid);
     }
+
+    mapping(uint => address)public productToEscrow;
+
+    function finalizeAuction(uint _productId) public {
+        Product storage product = stores[productIdToOwner[_productId]][_productId];
+        address buyer = product.highestBidder;
+        //指定买家地址
+        address seller = productIdToOwner[_productId];
+        //指定卖家地址
+        address arbiter = msg.sender;
+        //指定仲裁人
+        require(arbiter != buyer && arbiter != seller);
+        require(now > product.auctionEndTime);
+
+        require(product.status == ProductStatus.Open);
+
+
+        if(product.totalBids == 0){
+            product.status = ProductStatus.Unsold;
+        }else{
+            product.status = ProductStatus.Sold;
+        }
+
+        //.value（）进行外部调用时转钱
+        address escrow = (new Escrow).value(product.secondHighestBid)(buyer,seller,arbiter);
+        productToEscrow[_productId] = escrow;
+        buyer.transfer(product.highestBid - product.secondHighestBid);
+    }
+}
+
+contract Escrow{
+    //买家
+    address buyer;
+    //卖家
+    address seller;
+    //仲裁人
+    address arbiter;
+
+    constructor(address _buyer,address _seller,address _arbiter)public payable {
+        buyer = _buyer;
+        seller = _seller;
+        arbiter = _arbiter;
+    }
+
 
 }
