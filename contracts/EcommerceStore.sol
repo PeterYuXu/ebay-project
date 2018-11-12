@@ -1,4 +1,4 @@
-pragma solidity ^0.4.0;
+pragma solidity ^0.4.24;
 
 contract EcommerceStore {
     struct Product {
@@ -46,10 +46,10 @@ contract EcommerceStore {
             startPrice : _startPrice,
             auctionStartTime : _startTime,
             auctionEndTime : _endTime,
-            highestBigger : 0,
-            highestBig : 0,
-            totalBigs : 0,
-            secondHighestBig : 0,
+            highestBidder : 0,
+            highestBid : 0,
+            totalBids : 0,
+            secondHighestBid : 0,
             status : ProductStatus.Open,
             condition : ProductCondition(condition)
             });
@@ -77,6 +77,7 @@ contract EcommerceStore {
     function bid(uint _productId, bytes32 _bidHash) public payable {
         //找到商品
         Product storage product = stores[productIdToOwner[_productId]][_productId];
+        require(msg.value > product.startPrice);
         //竞拍总人数加一
         product.totalBids++;
         //构建竞标结构体
@@ -87,11 +88,11 @@ contract EcommerceStore {
 
     //生成哈希函数
     function makeBidHash(string _realAmount, string _secret) public pure returns (bytes32){
-        return sha3(_realAmount, _secret);
+        return keccak256(abi.encodePacked(_realAmount,_secret));
     }
 
     //返回竞标
-    function getBidById(uint _productId, byte32 _bidId) public view returns (uint, uint, bool, address){
+    function getBidById(uint _productId, bytes32 _bidId) public view returns (uint, uint, bool, address){
         Product storage product = stores[productIdToOwner[_productId]][_productId];
 
         Bid memory bid = product.bids[msg.sender][_bidId];
@@ -101,14 +102,14 @@ contract EcommerceStore {
 
     //返回当前金额
     function getBalance() public view returns (uint){
-        return this.balance;
+        return address(this).balance;
     }
 
     event revealEvent(uint productid, bytes32 bidId, uint idealPrice, uint price, uint refund);
 
     function revealBid(uint _productId, string _ideaPrice, string _secret) public {
         Product storage product = stores[productIdToOwner[_productId]][_productId];
-        bytes32 bidId = sha3(_ideaPrice, _secret);
+        bytes32 bidId = keccak256(abi.encodePacked(_ideaPrice,_secret));
 
         //一个人可以对同一个商品竞标多次，揭标的时候也要揭标多次
         Bid storage currBid = product.bids[msg.sender][bidId];
@@ -218,7 +219,7 @@ contract EcommerceStore {
         buyer.transfer(product.highestBid - product.secondHighestBid);
     }
 
-    function getEscrowInfo(unit _productId)public view returns(address, address, address, uint, uint){
+    function getEscrowInfo(uint _productId)public view returns(address, address, address, uint, uint){
         address escrow = productToEscrow[_productId];
         Escrow instanceContract = Escrow(escrow);
         return instanceContract.escrowInfo();
@@ -257,7 +258,7 @@ contract Escrow{
     }
 
     //方法
-    function giveMoneyToSeller(address caller) callerRestrict(caller) pubic {
+    function giveMoneyToSeller(address caller) callerRestrict(caller) public {
         //记录已经投票的状态，如果投过票，就设置为true
         require(!addressVotedMap[caller]);
         addressVotedMap[caller] = true;
@@ -280,7 +281,7 @@ contract Escrow{
 
 
     function getBalance () public view returns(uint){
-        return this.balance;
+        return address(this).balance;
     }
 
     modifier callerRestrict(address caller){
