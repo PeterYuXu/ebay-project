@@ -6,6 +6,13 @@ import { default as contract } from 'truffle-contract'
 // Import our contract artifacts and turn them into usable abstractions.
 import ecommerceStore from '../../build/contracts/EcommerceStore.json'
 import $ from 'jquery'
+import ipfsAPI from 'ipfs-api'
+
+const ipfs = ipfsAPI({
+    ip: 'localhost',
+    port: '5001',
+    protocol: 'http'
+})
 
 // MetaCoin is our usable abstraction, which we'll use through the code below.
 const ecommerceStoreContract = contract(ecommerceStore)
@@ -58,8 +65,10 @@ function renderProducts () {
     for (let i = 1; i <= productIndex; i++) {
       // 2. 获取每个产品的信息
       ecommerceStoreInstance.getProductById(i).then(productInfo => {
-        let { 0: id, 1: name, 2: category, 3: imageLink, 4: descLink, 5: auctionStartTime,
-          6: auctionEndTime, 7: startPrice, 8: status } = productInfo
+        let {
+          0: id, 1: name, 2: category, 3: imageLink, 4: descLink, 5: auctionStartTime,
+          6: auctionEndTime, 7: startPrice, 8: status
+        } = productInfo
         // 3. 每个产品创建一个node，填充数据，
         // console.table(productInfo)
         let node = $('<div/>')
@@ -91,3 +100,28 @@ function renderProducts () {
   })
 }
 
+// 解析url得到商品id
+function getProductId () {
+  console.log('search:', window.location.search)
+  let urlParams = new URLSearchParams(window.location.search)
+  let id = urlParams.get('id')
+  console.log('id:', id)
+  return id
+}
+
+function renderProductDetail (id) {
+  ecommerceStoreInstance.getProductById(id).then(productInfo => {
+    let {
+      0: id, 1: name, 2: category, 3: imageLink, 4: descLink, 5: auctionStartTime,
+      6: auctionEndTime, 7: startPrice, 8: status
+    } = productInfo
+  })
+
+    $('#product-image').append(`<img src="http://localhost:8888/ipfs/${imageLink}" width="150px"/>`)
+
+    let content = ''
+    ipfs.cat(descLink).then(file=> {
+      content += file.tostring()
+        $('#product-desc').append(`<div>${content}</div>`)
+    })
+}
