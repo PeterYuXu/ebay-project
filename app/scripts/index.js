@@ -9,9 +9,9 @@ import $ from 'jquery'
 import ipfsAPI from 'ipfs-api'
 
 const ipfs = ipfsAPI({
-    ip: 'localhost',
-    port: '5001',
-    protocol: 'http'
+  ip: 'localhost',
+  port: '5001',
+  protocol: 'http'
 })
 
 // MetaCoin is our usable abstraction, which we'll use through the code below.
@@ -117,11 +117,61 @@ function renderProductDetail (id) {
     } = productInfo
   })
 
-    $('#product-image').append(`<img src="http://localhost:8888/ipfs/${imageLink}" width="150px"/>`)
+  $('#product-image').append(`<img src="http://localhost:8888/ipfs/${imageLink}" width="150px"/>`)
 
-    let content = ''
-    ipfs.cat(descLink).then(file=> {
-      content += file.tostring()
-        $('#product-desc').append(`<div>${content}</div>`)
-    })
+  let content = ''
+  ipfs.cat(descLink).then(file => {
+    content += file.tostring()
+    $('#product-desc').append(`<div>${content}</div>`)
+  })
+
+  // - 辅助信息
+  console.log('startPrice :', startPrice)
+  console.log('name :', name)
+  console.log('auctionEndTime :', auctionEndTime)
+
+  // 1. 起始价格
+  $('#product-price').text(displayPrice(startPrice))
+  // 2. 竞拍倒计时（竞拍剩余时间，揭标剩余时间）duke 几个时间显示函数需要看一下
+  $('#product-auction-end').text(displayEndHours(auctionEndTime))
+  // 3. 产品的名称
+  $('#product-name').text(name)
+  // 4. 保存product-id到这个页面，后面的标签会使用到  duke
+  $('#product-id').val(id)
+}
+
+function displayPrice (price) {
+  return window.web3.fromWei(price, 'ether') + 'ETH'
+}
+
+function getCurrentTimeInSeconds () {
+  return Math.round(new Date() / 1000)
+}
+
+function displayEndHours (seconds) {
+  let currentTime = getCurrentTimeInSeconds()
+  let remainingSeconds = seconds - currentTime
+
+  if (remainingSeconds <= 0) {
+    return 'Auction has ended'
+  }
+}
+
+let days = Math.trunc(remainingSeconds / (24 * 60 * 60))
+
+remainingSeconds -= days * 24 * 60 * 60
+let hours = Math.trunc(remainingSeconds / (60 * 60))
+
+remainingSeconds -= hours * 60 * 60
+
+let minutes = Math.trunc(remainingSeconds / 60)
+
+if (days > 0) {
+  return 'Auction ends in ' + days + ' days, ' + hours + ', hours, ' + minutes + ' minutes'
+} else if (hours > 0) {
+  return 'Auction ends in ' + hours + ' hours, ' + minutes + ' minutes '
+} else if (minutes > 0) {
+  return 'Auction ends in ' + minutes + ' minutes '
+} else {
+  return 'Auction ends in ' + remainingSeconds + ' seconds'
 }
