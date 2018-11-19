@@ -7,6 +7,7 @@ import { default as contract } from 'truffle-contract'
 import ecommerceStore from '../../build/contracts/EcommerceStore.json'
 import $ from 'jquery'
 import ipfsAPI from 'ipfs-api'
+import ethUtil from 'ethereumjs-util'
 
 const ipfs = ipfsAPI({
   ip: 'localhost',
@@ -22,9 +23,20 @@ const App = {
   start: function () {
     console.log('Hello')
     ecommerceStoreContract.setProvider(window.web3.currentProvider)
+    console.log('11111')
     ecommerceStoreContract.deployed().then(i => {
       ecommerceStoreInstance = i
       renderProducts()
+
+      if ($('#product-details').length > 0) {
+        // 注意不是个函数
+        // ?id=2
+        // 1. 通过url得到产品id
+        let id = getProductId()
+
+        // 2. 通过id得到产品详情 //call()方式
+        renderProductDetail(id)
+      } // product-details
     })
   }
 }
@@ -61,6 +73,7 @@ window.addEventListener('load', function () {
 function renderProducts () {
   // 1. 获取所有的产品数量
   ecommerceStoreInstance.productIndex().then(productIndex => {
+    console.log('222222')
     // 注意！！
     for (let i = 1; i <= productIndex; i++) {
       // 2. 获取每个产品的信息
@@ -70,10 +83,9 @@ function renderProducts () {
           6: auctionEndTime, 7: startPrice, 8: status
         } = productInfo
         // 3. 每个产品创建一个node，填充数据，
-        // console.table(productInfo)
+        console.table(productInfo)
         let node = $('<div/>')
-        // 图片显示,我的ipfs默认端口为8888，可以去home目录下.ipfs/config中修改
-        node.append(`<img src="http://localhost:8888/ipfs/${imageLink}" width="150px"/>`)
+        node.append(`<img src="http://localhost:8080/ipfs/${imageLink}" width="150px"/>`)
         // 名字
         node.append(`<div>${name}</div>`)
         // 类别
@@ -115,29 +127,49 @@ function renderProductDetail (id) {
       0: id, 1: name, 2: category, 3: imageLink, 4: descLink, 5: auctionStartTime,
       6: auctionEndTime, 7: startPrice, 8: status
     } = productInfo
+    console.log(productInfo)
+    $('#product-image').append(`<img src="http://localhost:8080/ipfs/${imageLink}" width="150px"/>`)
+
+    let content = ''
+    // 先不用stream事件，直接使用字符串拼接
+    ipfs.cat(descLink).then(file => {
+      content += file.toString()
+      $('#product-desc').append(`<div>${content}</div>`)
+    })
+
+    // 1. 起始价格
+    $('#product-price').text(displayPrice(startPrice))
+    // 2. 竞拍倒计时（竞拍剩余时间，揭标剩余时间）duke 几个时间显示函数需要看一下
+    $('#product-auction-end').text(displayEndHours(auctionEndTime))
+    // 3. 产品的名称
+    $('#product-name').text(name)
+    // 4. 保存product-id到这个页面，后面的标签会使用到  duke
+    $('#product-id').val(id)
+
+    $('#bidding').submit(function (event) {
+      // 1. 理想出价
+      let bidAmount = $('#bid-amount').val()
+      // 2. 迷惑价格
+      let bidSend = $('#bid-send-amount').val()
+      // 3. 秘密字符串
+      let secretText = $('#secret-text').val()
+      // let secretText = 'xxx'
+      // 4. 产品id
+      let productId = $('#product-id').val()
+
+      let bidHash = '0x' + ethUtil.keccak256(window.web3.toWei(bidAmount, 'ether') + secretText).toString('hex')
+      ecommerceStoreInstance.bid(parseInt(productId), bidHash, {
+        from:window.web3.eth.accounts[0],
+        value: window.web3.toWei(bidSend, 'ether')
+      }).then(result => {
+        console.log('bid result:', result)
+        location.reload(true)
+      }).catch(e => {
+        console.log('bid err:', e)
+      })
+      event.preventDefault()
+    }) // bidding submit
   })
-
-  $('#product-image').append(`<img src="http://localhost:8888/ipfs/${imageLink}" width="150px"/>`)
-
-  let content = ''
-  ipfs.cat(descLink).then(file => {
-    content += file.tostring()
-    $('#product-desc').append(`<div>${content}</div>`)
-  })
-
-  // - 辅助信息
-  console.log('startPrice :', startPrice)
-  console.log('name :', name)
-  console.log('auctionEndTime :', auctionEndTime)
-
-  // 1. 起始价格
-  $('#product-price').text(displayPrice(startPrice))
-  // 2. 竞拍倒计时（竞拍剩余时间，揭标剩余时间）duke 几个时间显示函数需要看一下
-  $('#product-auction-end').text(displayEndHours(auctionEndTime))
-  // 3. 产品的名称
-  $('#product-name').text(name)
-  // 4. 保存product-id到这个页面，后面的标签会使用到  duke
-  $('#product-id').val(id)
 }
 
 function displayPrice (price) {
@@ -155,23 +187,24 @@ function displayEndHours (seconds) {
   if (remainingSeconds <= 0) {
     return 'Auction has ended'
   }
+
+  let days = Math.trunc(remainingSeconds / (24 * 60 * 60))
+
+  remainingSeconds -= days * 24 * 60 * 60
+  let hours = Math.trunc(remainingSeconds / (60 * 60))
+
+  remainingSeconds -= hours * 60 * 60
+
+  let minutes = Math.trunc(remainingSeconds / 60)
+
+  if (days > 0) {
+    return 'Auction ends in ' + days + ' days, ' + hours + ', hours, ' + minutes + ' minutes'
+  } else if (hours > 0) {
+    return 'Auction ends in ' + hours + ' hours, ' + minutes + ' minutes '
+  } else if (minutes > 0) {
+    return 'Auction ends in ' + minutes + ' minutes '
+  } else {
+    return 'Auction ends in ' + remainingSeconds + ' seconds'
+  }
 }
 
-let days = Math.trunc(remainingSeconds / (24 * 60 * 60))
-
-remainingSeconds -= days * 24 * 60 * 60
-let hours = Math.trunc(remainingSeconds / (60 * 60))
-
-remainingSeconds -= hours * 60 * 60
-
-let minutes = Math.trunc(remainingSeconds / 60)
-
-if (days > 0) {
-  return 'Auction ends in ' + days + ' days, ' + hours + ', hours, ' + minutes + ' minutes'
-} else if (hours > 0) {
-  return 'Auction ends in ' + hours + ' hours, ' + minutes + ' minutes '
-} else if (minutes > 0) {
-  return 'Auction ends in ' + minutes + ' minutes '
-} else {
-  return 'Auction ends in ' + remainingSeconds + ' seconds'
-}
