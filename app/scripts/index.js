@@ -169,6 +169,28 @@ function renderProductDetail (id) {
       })
       event.preventDefault()
     }) // bidding submit
+
+    $('#revealing').submit(function (event) {
+      let actualAmount = $('#actual-amount').val()
+      let secretText = $('#reveal-secret-text').val()
+      let productId = $('#product-id').val()
+      ecommerceStoreInstance.makeBidHash(web3.toWei(actualAmount, 'ether'), secretText).then(res => {
+        console.log('makeBidHash : ', res)
+      })
+
+      // function revealBid(uint _productId, uint _idealPrice, string _secret) public {
+      // toWei返回string，不是int
+      ecommerceStoreInstance.revealBid(parseInt(productId), web3.toWei(actualAmount, 'ether'), secretText, {
+        from: web3.eth.accounts[0]
+      }).then(result => {
+        console.log('revealBid successfully : ', result)
+        location.reload(true)
+      }).catch(e => {
+        console.log('revealBid failed : ', e)
+      })
+      // 防止form跳转
+      event.preventDefault()
+    }) // revealing
   })
 }
 
