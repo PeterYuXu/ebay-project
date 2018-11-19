@@ -37,6 +37,100 @@ const App = {
         // 2. 通过id得到产品详情 //call()方式
         renderProductDetail(id)
       } // product-details
+      $('#bidding').submit(function (event) {
+        // 1. 理想出价
+        let bidAmount = $('#bid-amount').val()
+        // 2. 迷惑价格
+        let bidSend = $('#bid-send-amount').val()
+        // 3. 秘密字符串
+        let secretText = $('#secret-text').val()
+        // let secretText = 'xxx'
+        // 4. 产品id
+        let productId = $('#product-id').val()
+
+        let bidHash = '0x' + ethUtil.keccak256(window.web3.toWei(bidAmount, 'ether') + secretText).toString('hex')
+        ecommerceStoreInstance.bid(parseInt(productId), bidHash, {
+          from:window.web3.eth.accounts[0],
+          value: window.web3.toWei(bidSend, 'ether')
+        }).then(result => {
+          console.log('bid result:', result)
+          location.reload(true)
+        }).catch(e => {
+          console.log('bid err:', e)
+        })
+        event.preventDefault()
+      }) // bidding submit
+
+      $('#revealing').submit(function (event) {
+        let actualAmount = $('#actual-amount').val()
+        let secretText = $('#reveal-secret-text').val()
+        let productId = $('#product-id').val()
+        ecommerceStoreInstance.makeBidHash(web3.toWei(actualAmount, 'ether'), secretText).then(res => {
+          console.log('makeBidHash : ', res)
+        })
+
+        // function revealBid(uint _productId, uint _idealPrice, string _secret) public {
+        // toWei返回string，不是int
+        ecommerceStoreInstance.revealBid(parseInt(productId), web3.toWei(actualAmount, 'ether'), secretText, {
+          from: web3.eth.accounts[0]
+        }).then(result => {
+          console.log('revealBid successfully : ', result)
+          location.reload(true)
+        }).catch(e => {
+          console.log('revealBid failed : ', e)
+        })
+        // 防止form跳转
+        event.preventDefault()
+      }) // revealing
+
+      $('#finalize-auction').submit(function (event) {
+        console.log()
+        let productId = $('#product-id').val()
+        // function finalizeAuction(uint _productId) public {
+        ecommerceStoreInstance.finalizeAuction(parseInt(productId), {
+          from: web3.eth.accounts[0]
+        }).then(result => {
+          alert('The auction has been finalize and winner declared.')
+          location.reload(true)
+          console.log('finlize-auction successfully : ', result)
+        }).catch(e => {
+          alert('The auction has been finalize and winner declared.')
+          console.log('finalize-auction failed : ', e)
+        })
+        event.preventDefault()
+      }) // finalize-auction
+
+      // 1. 向卖家付款：
+      //    1. 获取产品id
+      //    2. 调用giveToSeller方法
+      $('#release-funds').click(function (event) {
+        let id = getProductId()
+        ecommerceStoreInstance.giveToSeller(id, {
+          from: window.web3.eth.accounts[0]
+        }).then(result => {
+          alert('向卖家投票成功!')
+          location.reload(true)
+        }).catch(e => {
+          alert('向卖家投票失败!')
+        })
+        event.preventDefault()
+      }) // #release-funds
+
+      // 2. 向买家退款：
+      //    1. 获取产品id
+      //    2. 调用giveToBuyer方法
+      $('#refund-funds').click(function (event) {
+        let id = getProductId()
+        ecommerceStoreInstance.giveToBuyer(id, {
+          from: window.web3.eth.accounts[0]
+        }).then(result => {
+          alert('向买家投票成功!')
+          location.reload(true)
+        }).catch(e => {
+          alert('向买家投票失败!')
+        })
+        event.preventDefault()
+      }) // refund-funds
     })
   }
 }
@@ -108,68 +202,6 @@ function renderProducts () {
         // 4.组合append到id="product-list中
         $('#product-list').append(node)
       })
-      $('#bidding').submit(function (event) {
-        // 1. 理想出价
-        let bidAmount = $('#bid-amount').val()
-        // 2. 迷惑价格
-        let bidSend = $('#bid-send-amount').val()
-        // 3. 秘密字符串
-        let secretText = $('#secret-text').val()
-        // let secretText = 'xxx'
-        // 4. 产品id
-        let productId = $('#product-id').val()
-
-        let bidHash = '0x' + ethUtil.keccak256(window.web3.toWei(bidAmount, 'ether') + secretText).toString('hex')
-        ecommerceStoreInstance.bid(parseInt(productId), bidHash, {
-          from:window.web3.eth.accounts[0],
-          value: window.web3.toWei(bidSend, 'ether')
-        }).then(result => {
-          console.log('bid result:', result)
-          location.reload(true)
-        }).catch(e => {
-          console.log('bid err:', e)
-        })
-        event.preventDefault()
-      }) // bidding submit
-
-      $('#revealing').submit(function (event) {
-        let actualAmount = $('#actual-amount').val()
-        let secretText = $('#reveal-secret-text').val()
-        let productId = $('#product-id').val()
-        ecommerceStoreInstance.makeBidHash(web3.toWei(actualAmount, 'ether'), secretText).then(res => {
-          console.log('makeBidHash : ', res)
-        })
-
-        // function revealBid(uint _productId, uint _idealPrice, string _secret) public {
-        // toWei返回string，不是int
-        ecommerceStoreInstance.revealBid(parseInt(productId), web3.toWei(actualAmount, 'ether'), secretText, {
-          from: web3.eth.accounts[0]
-        }).then(result => {
-          console.log('revealBid successfully : ', result)
-          location.reload(true)
-        }).catch(e => {
-          console.log('revealBid failed : ', e)
-        })
-        // 防止form跳转
-        event.preventDefault()
-      }) // revealing
-
-      $('#finalize-auction').submit(function (event) {
-        console.log()
-        let productId = $('#product-id').val()
-        // function finalizeAuction(uint _productId) public {
-        ecommerceStoreInstance.finalizeAuction(parseInt(productId), {
-          from: web3.eth.accounts[0]
-        }).then(result => {
-          alert('The auction has been finalize and winner declared.')
-          location.reload(true)
-          console.log('finlize-auction successfully : ', result)
-        }).catch(e => {
-          alert('The auction has been finalize and winner declared.')
-          console.log('finalize-auction failed : ', e)
-        })
-        event.preventDefault()
-      }) // finalize-auction
     }
   })
 }
