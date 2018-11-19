@@ -368,3 +368,65 @@ function displayEndHours (seconds) {
   }
 }
 
+async function saveProduct (reader, parameters) {
+  // 将图片与数据添加到ipfs
+  console.log('image info :', reader)
+  let imageHash = await saveImageToIpfs(reader)
+  console.log('ipfs imageHash : ', imageHash)
+  let descHash = await saveDescInfoToIpfs(parameters['product-description'])
+  console.log('ipfs descHash : ', descHash)
+  // 将哈希等添加到区块链
+  saveProductToBlockChain(parameters, imageHash, descHash)
+}
+
+function saveImageToIpfs (imageData) {
+  return new Promise((resolve, reject) => {
+    const buffer = Buffer.from(imageData.result)
+    ipfs.add(buffer).then(response => {
+      console.log('ipfs add response : ', response)
+      resolve(response[0].hash)
+    }).catch(e => {
+      reject(e)
+    })
+  })
+}
+
+// 存储的数据是产品的描述信息，而不是所有的参数！
+function saveDescInfoToIpfs (productDescInfo) {
+  return new Promise((resolve, reject) => {
+    // 注意编码格式为utf-8
+    const buffer = Buffer.from(productDescInfo, 'utf-8')
+    ipfs.add(buffer).then(response => {
+      console.log('ipfs add desc response : ', response)
+      // 注意是reponse[0].hash
+      resolve(response[0].hash)
+    }).catch(e => {
+      reject(e)
+    })
+  })
+}
+
+function saveProductToBlockChain (parameters, imageHash, descHash) {
+  let name = parameters['product-name']
+  let category = parameters['product-category']
+  let startPrice = parameters['product-price']
+  let condition = parameters['product-condition']
+  let startTime = parameters['product-auction-start']
+  let duration = parameters['product-auction-end']
+  console.log('startTime :', startTime)
+  console.log('Date.parse(startTime) :', Date.parse(startTime))
+  let startTimeInSeconds = Date.parse(startTime) / 1000
+  let durationInSeconds = duration * 24 * 60 * 60
+  let endTimeInSeconds = startTimeInSeconds + durationInSeconds
+  let priceInEther = web3.toWei(startPrice, 'ether')
+
+  ecommerceStoreInstance.addProductToStore(name, category, imageHash, descHash,
+    startTimeInSeconds, endTimeInSeconds, priceInEther, condition, {
+      from: window.web3.eth.accounts[0]
+    }).then(result => {
+    console.log('addProductToStore result : ', result)
+  }).catch(e => {
+    console.log('addProductToStore failed:', e)
+  })
+}
+
