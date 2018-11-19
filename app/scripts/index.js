@@ -27,6 +27,12 @@ const App = {
     ecommerceStoreContract.deployed().then(i => {
       ecommerceStoreInstance = i
       renderProducts()
+      let reader
+      $('#product-image').change(function (event) {
+        const file = event.target.files[0]
+        reader = new window.FileReader()
+        reader.readAsArrayBuffer(file)
+      })
 
       $('#add-item-to-store').submit(function (event) {
         // 获取到表单的字符串数据
