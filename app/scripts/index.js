@@ -28,6 +28,23 @@ const App = {
       ecommerceStoreInstance = i
       renderProducts()
 
+      $('#add-item-to-store').submit(function (event) {
+        // 获取到表单的字符串数据
+        let reqInfo = $('#add-item-to-store').serialize()
+        console.log('reqInfo: ', reqInfo)
+        // 将数据转换成json格式
+        let parameters = JSON.parse(`{"${reqInfo.replace(/"/g, '\\"').replace(/&/g, '","').replace(/=/g, '":"')}"}`)
+        console.log('json parameters info : ', parameters)
+        let decodeParas = {}
+        // 对数据进行解码，编程非url类型的, 最后放在一个字典中
+        Object.keys(parameters).forEach(key => {
+          decodeParas[key] = decodeURIComponent(decodeURI(parameters[key]))
+        })
+        console.log('decode params :', decodeParas)
+        saveProduct(reader, decodeParas)
+        event.preventDefault()
+      })
+
       if ($('#product-details').length > 0) {
         // 注意不是个函数
         // ?id=2
