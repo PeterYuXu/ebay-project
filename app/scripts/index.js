@@ -191,6 +191,23 @@ function renderProductDetail (id) {
       // 防止form跳转
       event.preventDefault()
     }) // revealing
+
+    $('#finalize-auction').submit(function (event) {
+      console.log()
+      let productId = $('#product-id').val()
+      // function finalizeAuction(uint _productId) public {
+      ecommerceStoreInstance.finalizeAuction(parseInt(productId), {
+        from: web3.eth.accounts[0]
+      }).then(result => {
+        alert('The auction has been finalize and winner declared.')
+        location.reload(true)
+        console.log('finlize-auction successfully : ', result)
+      }).catch(e => {
+        alert('The auction has been finalize and winner declared.')
+        console.log('finalize-auction failed : ', e)
+      })
+      event.preventDefault()
+    }) // finalize-auction
   })
 }
 
