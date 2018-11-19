@@ -108,6 +108,68 @@ function renderProducts () {
         // 4.组合append到id="product-list中
         $('#product-list').append(node)
       })
+      $('#bidding').submit(function (event) {
+        // 1. 理想出价
+        let bidAmount = $('#bid-amount').val()
+        // 2. 迷惑价格
+        let bidSend = $('#bid-send-amount').val()
+        // 3. 秘密字符串
+        let secretText = $('#secret-text').val()
+        // let secretText = 'xxx'
+        // 4. 产品id
+        let productId = $('#product-id').val()
+
+        let bidHash = '0x' + ethUtil.keccak256(window.web3.toWei(bidAmount, 'ether') + secretText).toString('hex')
+        ecommerceStoreInstance.bid(parseInt(productId), bidHash, {
+          from:window.web3.eth.accounts[0],
+          value: window.web3.toWei(bidSend, 'ether')
+        }).then(result => {
+          console.log('bid result:', result)
+          location.reload(true)
+        }).catch(e => {
+          console.log('bid err:', e)
+        })
+        event.preventDefault()
+      }) // bidding submit
+
+      $('#revealing').submit(function (event) {
+        let actualAmount = $('#actual-amount').val()
+        let secretText = $('#reveal-secret-text').val()
+        let productId = $('#product-id').val()
+        ecommerceStoreInstance.makeBidHash(web3.toWei(actualAmount, 'ether'), secretText).then(res => {
+          console.log('makeBidHash : ', res)
+        })
+
+        // function revealBid(uint _productId, uint _idealPrice, string _secret) public {
+        // toWei返回string，不是int
+        ecommerceStoreInstance.revealBid(parseInt(productId), web3.toWei(actualAmount, 'ether'), secretText, {
+          from: web3.eth.accounts[0]
+        }).then(result => {
+          console.log('revealBid successfully : ', result)
+          location.reload(true)
+        }).catch(e => {
+          console.log('revealBid failed : ', e)
+        })
+        // 防止form跳转
+        event.preventDefault()
+      }) // revealing
+
+      $('#finalize-auction').submit(function (event) {
+        console.log()
+        let productId = $('#product-id').val()
+        // function finalizeAuction(uint _productId) public {
+        ecommerceStoreInstance.finalizeAuction(parseInt(productId), {
+          from: web3.eth.accounts[0]
+        }).then(result => {
+          alert('The auction has been finalize and winner declared.')
+          location.reload(true)
+          console.log('finlize-auction successfully : ', result)
+        }).catch(e => {
+          alert('The auction has been finalize and winner declared.')
+          console.log('finalize-auction failed : ', e)
+        })
+        event.preventDefault()
+      }) // finalize-auction
     }
   })
 }
@@ -145,69 +207,73 @@ function renderProductDetail (id) {
     $('#product-name').text(name)
     // 4. 保存product-id到这个页面，后面的标签会使用到  duke
     $('#product-id').val(id)
+    $('#bidding, #revealing, #finalize-auction, #escrow-info').hide()
+    let currentTime = getCurrentTimeInSeconds()
 
-    $('#bidding').submit(function (event) {
-      // 1. 理想出价
-      let bidAmount = $('#bid-amount').val()
-      // 2. 迷惑价格
-      let bidSend = $('#bid-send-amount').val()
-      // 3. 秘密字符串
-      let secretText = $('#secret-text').val()
-      // let secretText = 'xxx'
-      // 4. 产品id
-      let productId = $('#product-id').val()
-
-      let bidHash = '0x' + ethUtil.keccak256(window.web3.toWei(bidAmount, 'ether') + secretText).toString('hex')
-      ecommerceStoreInstance.bid(parseInt(productId), bidHash, {
-        from:window.web3.eth.accounts[0],
-        value: window.web3.toWei(bidSend, 'ether')
-      }).then(result => {
-        console.log('bid result:', result)
-        location.reload(true)
-      }).catch(e => {
-        console.log('bid err:', e)
+    // 产品竞标情况status ： 0--> 进行中  1---> 卖掉  2---> 没卖掉
+    // 从这里入手！！
+    if (parseInt(status) === 0) {
+      console.log('status === 0')
+      // Open：还在竞标中，已经揭标
+      // 1. 竞标阶段
+      // 1. 只显示竞标的表单
+      // 2. 揭标阶段
+      // 1. 只显示揭标表单
+      // 2. 隐藏竞标表单
+      if (currentTime < parseInt(auctionEndTime)) {
+        // 竞标阶段
+        $('#bidding').show()
+      } else if (currentTime < parseInt(auctionEndTime) + 36) {
+        // 揭标阶段
+        $('#revealing').show()
+      } else {
+        // 仲裁阶段
+        $('#finalize-auction').show()
+      }
+    } else if (parseInt(status) === 1) {
+      console.log('status === 1')
+      // Sold：卖了，执行了finazlie
+      //
+      // 1. 执行finalize
+      // 1. 只显示finalize按钮
+      // 2. 隐藏竞标表单
+      // 3. 隐藏揭标表单
+      // 4. 显示当前中标的信息（第三方合约信息：买家，卖家，仲裁人，投票情况）
+      $('#escrow-info').show()
+      let finalPrice
+      ecommerceStoreInstance.getHighestBidInfo.call(id).then(info => {
+        const { 0: highestBidder, 1: highestBid, 2: secondBid } = info
+        finalPrice = secondBid
+        $('#product-status').html(`<p>产品状态：揭标已结束，最高价：${displayPrice(highestBid)}, 开始进入仲裁投票阶段!</p>`)
       })
-      event.preventDefault()
-    }) // bidding submit
 
-    $('#revealing').submit(function (event) {
-      let actualAmount = $('#actual-amount').val()
-      let secretText = $('#reveal-secret-text').val()
-      let productId = $('#product-id').val()
-      ecommerceStoreInstance.makeBidHash(web3.toWei(actualAmount, 'ether'), secretText).then(res => {
-        console.log('makeBidHash : ', res)
-      })
+      ecommerceStoreInstance.getEscrowInfo.call(id).then(escroInfo => {
+        console.log('escroInfo:', escroInfo)
+        // return (buyer, seller, arbiter, buyerVotesCount, sellerVotesCount);
+        const { 0: buyer, 1: seller, 2: arbiter, 3: buyerVotesCount, 4: sellerVotesCount } = escroInfo
+        $('#buyer').html(`<p>买家：${buyer}</p>`)
+        $('#seller').html(`<p>卖家：${seller}</p>`)
+        $('#arbiter').html(`<p>仲裁：${arbiter}</p>`)
 
-      // function revealBid(uint _productId, uint _idealPrice, string _secret) public {
-      // toWei返回string，不是int
-      ecommerceStoreInstance.revealBid(parseInt(productId), web3.toWei(actualAmount, 'ether'), secretText, {
-        from: web3.eth.accounts[0]
-      }).then(result => {
-        console.log('revealBid successfully : ', result)
-        location.reload(true)
-      }).catch(e => {
-        console.log('revealBid failed : ', e)
+        if (parseInt(buyerVotesCount) === 2) {
+          $('#refund-count').html(`<p>商品未成交，已退款给买家!`)
+          $('#product-status').html(`<p>产品状态：拍卖已结束!</p>`)
+        } else if (parseInt(sellerVotesCount) === 2) {
+          $('#release-count').html(`<p>商品成交，已付款给卖家, 成交价：${web3.fromWei(finalPrice, 'ether')} ETH`)
+          $('#product-status').html(`<p>产品状态：拍卖已结束</p>`)
+        } else {
+          $('#refund-count').html(`<p>买家获得: ${buyerVotesCount}/3 票`)
+          $('#release-count').html(`<p>卖家获得: ${sellerVotesCount}/3 票`)
+        }
       })
-      // 防止form跳转
-      event.preventDefault()
-    }) // revealing
-
-    $('#finalize-auction').submit(function (event) {
-      console.log()
-      let productId = $('#product-id').val()
-      // function finalizeAuction(uint _productId) public {
-      ecommerceStoreInstance.finalizeAuction(parseInt(productId), {
-        from: web3.eth.accounts[0]
-      }).then(result => {
-        alert('The auction has been finalize and winner declared.')
-        location.reload(true)
-        console.log('finlize-auction successfully : ', result)
-      }).catch(e => {
-        alert('The auction has been finalize and winner declared.')
-        console.log('finalize-auction failed : ', e)
-      })
-      event.preventDefault()
-    }) // finalize-auction
+      //
+    } else if (parseInt(status) === 2) {
+      console.log('status === 2')
+      // Unsold：没卖掉，自始至终没有竞标（或者是有人竞标但是没人揭标，竞标人损失钱，卖家也得不到）
+      //
+      // 1. 执行finalize发现没人竞标
+      $('#product-status').html(`<p>产品状态：拍卖结束，未卖出</p>`)
+    }
   })
 }
 
